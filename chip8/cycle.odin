@@ -1,5 +1,9 @@
 package chip8
 
+import "core:fmt"
+
+STEP :: 2
+
 cycle :: proc(cpu: ^CPU) {
 	// Join 2 bytes (u8) into 1 u16
 	cpu.opcode = u16(cpu.ram[cpu.pc]) << 8 | u16(cpu.ram[cpu.pc + 1])
@@ -17,7 +21,7 @@ cycle :: proc(cpu: ^CPU) {
 			SYS(cpu)
 		}
 	case 1:
-		JP_addr(cpu)
+		JP(cpu)
 	case 2:
 		CALL(cpu)
 	case 3:
@@ -42,8 +46,41 @@ cycle :: proc(cpu: ^CPU) {
 			XOR_xy(cpu)
 		case 4:
 			ADD_xy(cpu)
+		case 5:
+			SUB(cpu)
+		case 6:
+			SHR(cpu)
+		case 7:
+			SUBN(cpu)
+		case 0xE:
+			SHL(cpu)
+		case:
+			fmt.printf("unknown opcode: %x (%b)\n", cpu.opcode, cpu.opcode)
 		}
+	case 9:
+		SNE(cpu)
+	case 0xA:
+		LD_I(cpu)
+	case 0xB:
+		JP_offset(cpu)
+	case 0xC:
+		RND(cpu)
+	case 0xD:
+		DRW(cpu)
+	case 0xE:
+		op := OpcodeXYZ(cpu.opcode)
+		switch {
+		case op.y == 0x9 && op.z == 0xE:
+			SKP(cpu)
+		case op.y == 0xA && op.z == 0x1:
+			SKNP(cpu)
+		case:
+			fmt.printf("unknown opcode: %x (%b)\n", cpu.opcode, cpu.opcode)
+		}
+	case 0xF:
+	case:
+		fmt.printf("unknown opcode: %x (%b)\n", cpu.opcode, cpu.opcode)
 	}
 
-	cpu.pc += 1
+	cpu.pc += STEP
 }

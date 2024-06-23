@@ -38,7 +38,7 @@ RET :: proc(cpu: ^CPU) {
 Jump to location nnn.
 
 The interpreter sets the program counter to nnn.*/
-JP_addr :: proc(cpu: ^CPU) {
+JP :: proc(cpu: ^CPU) {
 	using cpu
 	op := OpcodeAddr(opcode)
 	cpu.pc = op.a
@@ -66,7 +66,7 @@ SE_byte :: proc(cpu: ^CPU) {
 	op := OpcodeXKK(cpu.opcode)
 
 	if cpu.regs[op.x] == op.kk {
-		cpu.pc += 1
+		cpu.pc += STEP
 	}
 }
 
@@ -79,7 +79,7 @@ SNE_byte :: proc(cpu: ^CPU) {
 	op := OpcodeXKK(cpu.opcode)
 
 	if cpu.regs[op.x] != op.kk {
-		cpu.pc += 1
+		cpu.pc += STEP
 	}
 }
 
@@ -92,7 +92,7 @@ SE_xy :: proc(cpu: ^CPU) {
 	op := OpcodeXYZ(cpu.opcode)
 
 	if cpu.regs[op.x] == cpu.regs[op.y] {
-		cpu.pc += 1
+		cpu.pc += STEP
 	}
 }
 
@@ -178,6 +178,8 @@ ADD_xy :: proc(cpu: ^CPU) {
 	} else {
 		cpu.regs[0xF] = 0
 	}
+
+	cpu.regs[op.x] = sum
 }
 
 /* 8xy5 - SUB Vx, Vy
@@ -185,6 +187,18 @@ Set Vx = Vx - Vy, set VF = NOT borrow.
 
 If Vx > Vy, then VF is set to 1, otherwise 0. Then Vy is subtracted from 
 Vx, and the results stored in Vx.*/
+SUB :: proc(cpu: ^CPU) {
+	op := OpcodeXYZ(cpu.opcode)
+	using cpu
+
+	if regs[op.x] > regs[op.y] {
+		regs[0xF] = 1
+	} else {
+		regs[0xF] = 0
+	}
+
+	regs[op.x] -= regs[op.y]
+}
 
 
 /* 8xy6 - SHR Vx {, Vy}
@@ -192,6 +206,18 @@ Set Vx = Vx SHR 1.
 
 If the least-significant bit of Vx is 1, then VF is set to 1, otherwise 
 0. Then Vx is divided by 2.*/
+SHR :: proc(cpu: ^CPU) {
+	op := OpcodeXYZ(cpu.opcode)
+	using cpu
+
+	if op.x & 0b0001 == 1 {
+		regs[0xF] = 1
+	} else {
+		regs[0xF] = 0
+	}
+
+	regs[op.x] /= 2
+}
 
 
 /* 8xy7 - SUBN Vx, Vy
@@ -199,6 +225,18 @@ Set Vx = Vy - Vx, set VF = NOT borrow.
 
 If Vy > Vx, then VF is set to 1, otherwise 0. Then Vx is subtracted from 
 Vy, and the results stored in Vx.*/
+SUBN :: proc(cpu: ^CPU) {
+	op := OpcodeXYZ(cpu.opcode)
+	using cpu
+
+	if regs[op.y] > regs[op.x] {
+		regs[0xF] = 1
+	} else {
+		regs[0xF] = 0
+	}
+
+	regs[op.x] = regs[op.y] - regs[op.x]
+}
 
 
 /* 8xyE - SHL Vx {, Vy}
@@ -206,6 +244,15 @@ Set Vx = Vx SHL 1.
 
 If the most-significant bit of Vx is 1, then VF is set to 1, otherwise 
 to 0. Then Vx is multiplied by 2.*/
+// TODO: this is shift
+SHL :: proc(cpu: ^CPU) {
+	op := OpcodeXYZ(cpu.opcode)
+	using cpu
+
+	left_bit := regs[op.x] >> 7
+	regs[0xF] = left_bit
+	regs[op.x] *= 2
+}
 
 
 /* 9xy0 - SNE Vx, Vy
@@ -213,18 +260,34 @@ Skip next instruction if Vx != Vy.
 
 The values of Vx and Vy are compared, and if they are not equal, the program 
 counter is increased by 2.*/
+SNE :: proc(cpu: ^CPU) {
+	op := OpcodeXYZ(cpu.opcode)
+
+	if cpu.regs[op.x] != cpu.regs[op.y] {
+		cpu.pc += STEP
+	}
+}
 
 
 /* Annn - LD I, addr
 Set I = nnn.
 
 The value of register I is set to nnn.*/
+LD_I :: proc(cpu: ^CPU) {
+	op := OpcodeAddr(cpu.opcode)
+	cpu.reg_i = op.a
+}
 
 
 /* Bnnn - JP V0, addr
 Jump to location nnn + V0.
 
 The program counter is set to nnn plus the value of V0.*/
+JP_offset :: proc(cpu: ^CPU) {
+	using cpu
+	op := OpcodeAddr(opcode)
+	cpu.pc = op.a + u16(regs[0x0])
+}
 
 
 /* Cxkk - RND Vx, byte
@@ -233,6 +296,12 @@ Set Vx = random byte AND kk.
 The interpreter generates a random number from 0 to 255, which is then 
 ANDed with the value kk. The results are stored in Vx. See instruction 
 8xy2 for more information on AND.*/
+RND :: proc(cpu: ^CPU) {
+	op := OpcodeXKK(cpu.opcode)
+	using cpu
+
+	regs[op.x] = random_byte() & op.kk
+}
 
 
 /* Dxyn - DRW Vx, Vy, nibble
@@ -246,6 +315,9 @@ is positioned so part of it is outside the coordinates of the display,
 it wraps around to the opposite side of the screen. See instruction 8xy3 
 for more information on XOR, and section 2.4, Display, for more information 
 on the Chip-8 screen and sprites.*/
+DRW :: proc(cpu: ^CPU) {
+	op := OpcodeXYZ(cpu.opcode)
+}
 
 
 /* Ex9E - SKP Vx
@@ -253,6 +325,9 @@ Skip next instruction if key with the value of Vx is pressed.
 
 Checks the keyboard, and if the key corresponding to the value of Vx is 
 currently in the down position, PC is increased by 2.*/
+SKP :: proc(cpu: ^CPU) {
+	op := OpcodeXYZ(cpu.opcode)
+}
 
 
 /* ExA1 - SKNP Vx
@@ -260,12 +335,18 @@ Skip next instruction if key with the value of Vx is not pressed.
 
 Checks the keyboard, and if the key corresponding to the value of Vx is 
 currently in the up position, PC is increased by 2.*/
+SKNP :: proc(cpu: ^CPU) {
+	op := OpcodeXYZ(cpu.opcode)
+}
 
 
 /* Fx07 - LD Vx, DT
 Set Vx = delay timer value.
 
 The value of DT is placed into Vx.*/
+LD_Vx_DT :: proc(cpu: ^CPU) {
+	op := OpcodeXYZ(cpu.opcode)
+}
 
 
 /* Fx0A - LD Vx, K
@@ -273,24 +354,36 @@ Wait for a key press, store the value of the key in Vx.
 
 All execution stops until a key is pressed, then the value of that key 
 is stored in Vx.*/
+LD_Vx_K :: proc(cpu: ^CPU) {
+	op := OpcodeXYZ(cpu.opcode)
+}
 
 
 /* Fx15 - LD DT, Vx
 Set delay timer = Vx.
 
 DT is set equal to the value of Vx.*/
+LD_DT :: proc(cpu: ^CPU) {
+	op := OpcodeXYZ(cpu.opcode)
+}
 
 
 /* Fx18 - LD ST, Vx
 Set sound timer = Vx.
 
 ST is set equal to the value of Vx.*/
+LD_ST :: proc(cpu: ^CPU) {
+	op := OpcodeXYZ(cpu.opcode)
+}
 
 
 /* Fx1E - ADD I, Vx
 Set I = I + Vx.
 
 The values of I and Vx are added, and the results are stored in I.*/
+ADD_I :: proc(cpu: ^CPU) {
+	op := OpcodeXYZ(cpu.opcode)
+}
 
 
 /* Fx29 - LD F, Vx
@@ -299,6 +392,9 @@ Set I = location of sprite for digit Vx.
 The value of I is set to the location for the hexadecimal sprite corresponding 
 to the value of Vx. See section 2.4, Display, for more information on the 
 Chip-8 hexadecimal font.*/
+LD_F_Vx :: proc(cpu: ^CPU) { 	// TODO: rename
+	op := OpcodeXYZ(cpu.opcode)
+}
 
 
 /* Fx33 - LD B, Vx
@@ -307,13 +403,19 @@ Store BCD representation of Vx in memory locations I, I+1, and I+2.
 The interpreter takes the decimal value of Vx, and places the hundreds 
 digit in memory at location in I, the tens digit at location I+1, and the 
 ones digit at location I+2.*/
+LD_B :: proc(cpu: ^CPU) { 	// TODO: what the fuck?
+	op := OpcodeXYZ(cpu.opcode)
+}
 
 
 /* Fx55 - LD [I], Vx
 Store registers V0 through Vx in memory starting at location I.
 
-The interpreter copies the values of registers V0 through Vx into memory
-, starting at the address in I.*/
+The interpreter copies the values of registers V0 through Vx into memory, 
+starting at the address in I.*/
+LD_I_Vx :: proc(cpu: ^CPU) {
+	op := OpcodeXYZ(cpu.opcode)
+}
 
 
 /* Fx65 - LD Vx, [I]
@@ -321,3 +423,6 @@ Read registers V0 through Vx from memory starting at location I.
 
 The interpreter reads values from memory starting at location I into registers 
 V0 through Vx.*/
+LD_Vx_I :: proc(cpu: ^CPU) {
+	op := OpcodeXYZ(cpu.opcode)
+}
