@@ -78,6 +78,32 @@ cycle :: proc(cpu: ^CPU) {
 			fmt.printf("unknown opcode: %x (%b)\n", cpu.opcode, cpu.opcode)
 		}
 	case 0xF:
+		switch op.y {
+		case 0:
+			switch op.z {
+			case 7:
+				LD_Vx_DT(cpu)
+			case 0xA:
+				LD_Vx_K(cpu)
+			}
+		case 1:
+			switch op.z {
+			case 5:
+				LD_DT(cpu)
+			case 8:
+				LD_ST(cpu)
+			case 0xE:
+				ADD_I(cpu)
+			}
+		case 2:
+			LD_F_Vx(cpu)
+		case 3:
+			LD_B(cpu)
+		case 5:
+			LD_I_Vx(cpu)
+		case 6:
+			LD_Vx_I(cpu)
+		}
 	case:
 		fmt.printf("unknown opcode: %x (%b)\n", cpu.opcode, cpu.opcode)
 	}
