@@ -5,6 +5,10 @@ import "core:fmt"
 STEP :: 2
 
 cycle :: proc(cpu: ^CPU) {
+	/* TODO:
+    - Delay and sound timer autodecrement
+    */
+
 	// Join 2 bytes (u8) into 1 u16
 	cpu.opcode = u16(cpu.ram[cpu.pc]) << 8 | u16(cpu.ram[cpu.pc + 1])
 

@@ -4,8 +4,15 @@ import ch "chip8"
 import "core:fmt"
 import "core:os"
 import "core:time"
+import rl "vendor:raylib"
 
 main :: proc() {
+	fmt.println("waiting a key")
+
+	keycode := ch.wait_and_get_key()
+
+	fmt.printf("got key: %c\n", keycode)
+	/*
 	cpu := ch.CPU{}
 	for b, i in test_program {
 		cpu.ram[i] = b
@@ -19,4 +26,5 @@ main :: proc() {
 		ch.cycle(&cpu)
 		time.sleep(1 * time.Second)
 	}
+    */
 }

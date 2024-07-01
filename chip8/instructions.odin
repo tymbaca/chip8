@@ -244,7 +244,6 @@ Set Vx = Vx SHL 1.
 
 If the most-significant bit of Vx is 1, then VF is set to 1, otherwise 
 to 0. Then Vx is multiplied by 2.*/
-// TODO: this is shift
 SHL :: proc(cpu: ^CPU) {
 	op := OpcodeXYZ(cpu.opcode)
 	using cpu
@@ -317,6 +316,7 @@ for more information on XOR, and section 2.4, Display, for more information
 on the Chip-8 screen and sprites.*/
 DRW :: proc(cpu: ^CPU) {
 	op := OpcodeXYZ(cpu.opcode)
+	// TODO:
 }
 
 
@@ -327,6 +327,10 @@ Checks the keyboard, and if the key corresponding to the value of Vx is
 currently in the down position, PC is increased by 2.*/
 SKP :: proc(cpu: ^CPU) {
 	op := OpcodeXYZ(cpu.opcode)
+
+	if is_key_pressed(op.x) {
+		cpu.pc += 1
+	}
 }
 
 
@@ -337,6 +341,10 @@ Checks the keyboard, and if the key corresponding to the value of Vx is
 currently in the up position, PC is increased by 2.*/
 SKNP :: proc(cpu: ^CPU) {
 	op := OpcodeXYZ(cpu.opcode)
+
+	if !is_key_pressed(op.x) {
+		cpu.pc += 1
+	}
 }
 
 
@@ -346,6 +354,7 @@ Set Vx = delay timer value.
 The value of DT is placed into Vx.*/
 LD_Vx_DT :: proc(cpu: ^CPU) {
 	op := OpcodeXYZ(cpu.opcode)
+	cpu.regs[op.x] = cpu.delay_timer
 }
 
 
@@ -356,6 +365,8 @@ All execution stops until a key is pressed, then the value of that key
 is stored in Vx.*/
 LD_Vx_K :: proc(cpu: ^CPU) {
 	op := OpcodeXYZ(cpu.opcode)
+	key := wait_and_get_key()
+	// TODO:
 }
 
 
@@ -365,6 +376,8 @@ Set delay timer = Vx.
 DT is set equal to the value of Vx.*/
 LD_DT :: proc(cpu: ^CPU) {
 	op := OpcodeXYZ(cpu.opcode)
+
+	cpu.delay_timer = cpu.regs[op.x]
 }
 
 
@@ -374,6 +387,8 @@ Set sound timer = Vx.
 ST is set equal to the value of Vx.*/
 LD_ST :: proc(cpu: ^CPU) {
 	op := OpcodeXYZ(cpu.opcode)
+
+	cpu.sound_timer = cpu.regs[op.x]
 }
 
 
@@ -383,6 +398,8 @@ Set I = I + Vx.
 The values of I and Vx are added, and the results are stored in I.*/
 ADD_I :: proc(cpu: ^CPU) {
 	op := OpcodeXYZ(cpu.opcode)
+
+	cpu.reg_i = cpu.reg_i + u16(cpu.regs[op.x])
 }
 
 
@@ -392,8 +409,9 @@ Set I = location of sprite for digit Vx.
 The value of I is set to the location for the hexadecimal sprite corresponding 
 to the value of Vx. See section 2.4, Display, for more information on the 
 Chip-8 hexadecimal font.*/
-LD_F_Vx :: proc(cpu: ^CPU) { 	// TODO: rename
+LD_F_Vx :: proc(cpu: ^CPU) {
 	op := OpcodeXYZ(cpu.opcode)
+	// TODO:
 }
 
 
@@ -403,8 +421,22 @@ Store BCD representation of Vx in memory locations I, I+1, and I+2.
 The interpreter takes the decimal value of Vx, and places the hundreds 
 digit in memory at location in I, the tens digit at location I+1, and the 
 ones digit at location I+2.*/
-LD_B :: proc(cpu: ^CPU) { 	// TODO: what the fuck?
+LD_B :: proc(cpu: ^CPU) {
 	op := OpcodeXYZ(cpu.opcode)
+
+	vx := cpu.regs[op.x]
+
+	// 243  51  99  10   6
+	// 2__ 0__ 0__ 0__ 0__
+	// _4_ _5_ _9_ _1_ _0_
+	// __3 __1 __9 __0 __6
+	hundreds := vx / 100 % 10
+	tens := vx / 10 % 10
+	ones := vx / 1 % 10
+
+	cpu.ram[cpu.reg_i] = hundreds
+	cpu.ram[cpu.reg_i + 1] = tens
+	cpu.ram[cpu.reg_i + 2] = ones
 }
 
 
@@ -415,6 +447,10 @@ The interpreter copies the values of registers V0 through Vx into memory,
 starting at the address in I.*/
 LD_I_Vx :: proc(cpu: ^CPU) {
 	op := OpcodeXYZ(cpu.opcode)
+
+	for idx in 0 ..= op.x {
+		cpu.ram[cpu.reg_i + u16(idx)] = cpu.regs[idx]
+	}
 }
 
 
@@ -425,4 +461,8 @@ The interpreter reads values from memory starting at location I into registers
 V0 through Vx.*/
 LD_Vx_I :: proc(cpu: ^CPU) {
 	op := OpcodeXYZ(cpu.opcode)
+
+	for idx in 0 ..= op.x {
+		cpu.regs[idx] = cpu.regs[cpu.reg_i + u16(idx)]
+	}
 }
